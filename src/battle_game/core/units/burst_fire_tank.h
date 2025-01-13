@@ -2,13 +2,9 @@
 #include "battle_game/core/unit.h"
 
 namespace battle_game::unit {
-class OldTank : public Unit {
+class BurstTank : public Unit {
  public:
-  OldTank(GameCore *game_core, uint32_t id, uint32_t player_id);
-  static constexpr int MaxTickPerSecond = 100;
-  float speed_record[MaxTickPerSecond];
-  float rotate_record[MaxTickPerSecond];
-  float fire_record[MaxTickPerSecond];
+  BurstTank(GameCore *game_core, uint32_t id, uint32_t player_id);
   void Render() override;
   void Update() override;
   [[nodiscard]] bool IsHit(glm::vec2 position) const override;

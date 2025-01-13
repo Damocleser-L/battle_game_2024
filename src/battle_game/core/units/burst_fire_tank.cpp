@@ -1,4 +1,4 @@
-#include "old_tank_lhy.h"
+#include "burst_fire_tank.h"
 
 #include "battle_game/core/bullets/bullets.h"
 #include "battle_game/core/game_core.h"
@@ -11,12 +11,8 @@ uint32_t tank_body_model_index = 0xffffffffu;
 uint32_t tank_turret_model_index = 0xffffffffu;
 }  // namespace
 
-OldTank::OldTank(GameCore *game_core, uint32_t id, uint32_t player_id)
+BurstTank::BurstTank(GameCore *game_core, uint32_t id, uint32_t player_id)
     : Unit(game_core, id, player_id) {
-  for (int i = 0; i <= MaxTickPerSecond; i++) {
-    speed_record[i] = rotate_record[i] = fire_record[i] = 0.0f;
-  }
-
   if (!~tank_body_model_index) {
     auto mgr = AssetsManager::GetInstance();
     {
@@ -74,7 +70,7 @@ OldTank::OldTank(GameCore *game_core, uint32_t id, uint32_t player_id)
   }
 }
 
-void OldTank::Render() {
+void BurstTank::Render() {
   battle_game::SetTransformation(position_, rotation_);
   battle_game::SetTexture(0);
   battle_game::SetColor(game_core_->GetPlayerColor(player_id_));
@@ -83,38 +79,22 @@ void OldTank::Render() {
   battle_game::DrawModel(tank_turret_model_index);
 }
 
-void OldTank::Update() {
+void BurstTank::Update() {
   TankMove(3.0f, glm::radians(180.0f));
   TurretRotate();
   Fire();
 }
 
-void OldTank::TankMove(float move_speed, float rotate_angular_speed) {
+void BurstTank::TankMove(float move_speed, float rotate_angular_speed) {
   auto player = game_core_->GetPlayer(player_id_);
   if (player) {
     auto &input_data = player->GetInputData();
     glm::vec2 offset{0.0f};
-    offset.y += speed_record[0] * 1.0f;
-    for (int i = 1; i < MaxTickPerSecond; i++) {
-      speed_record[i - 1] = speed_record[i];
-    }
     if (input_data.key_down[GLFW_KEY_W]) {
-      int late_tick = (int)kTickPerSecond * 0.5f;
-      float speed_process[19] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07,
-                             0.08, 0.09, 0.1,  0.09, 0.08, 0.07, 0.06,
-                             0.05, 0.04, 0.03, 0.02, 0.01};
-      for (int i = 0; i < 19; i++) {
-        speed_record[late_tick + i] += speed_process[i];
-      }
+      offset.y += 1.0f;
     }
     if (input_data.key_down[GLFW_KEY_S]) {
-      int late_tick = (int)kTickPerSecond * 0.5f;
-      float speed_process[19] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07,
-                                 0.08, 0.09, 0.1,  0.09, 0.08, 0.07, 0.06,
-                                 0.05, 0.04, 0.03, 0.02, 0.01};
-      for (int i = 0; i < 19; i++) {
-        speed_record[late_tick + i] -= speed_process[i];
-      }
+      offset.y -= 1.0f;
     }
     float speed = move_speed * GetSpeedScale();
     offset *= kSecondPerTick * speed;
@@ -125,34 +105,19 @@ void OldTank::TankMove(float move_speed, float rotate_angular_speed) {
     if (!game_core_->IsBlockedByObstacles(new_position)) {
       game_core_->PushEventMoveUnit(id_, new_position);
     }
-    float rotation_offset = rotate_record[0] * 1.0f;
-    for (int i = 1; i < MaxTickPerSecond; i++) {
-      rotate_record[i - 1] = rotate_record[i];
-    }
+    float rotation_offset = 0.0f;
     if (input_data.key_down[GLFW_KEY_A]) {
-      int late_tick = (int)kTickPerSecond * 0.5f;
-      float rotate_process[19] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07,
-                                 0.08, 0.09, 0.1,  0.09, 0.08, 0.07, 0.06,
-                                 0.05, 0.04, 0.03, 0.02, 0.01};
-      for (int i = 0; i < 19; i++) {
-        rotate_record[late_tick + i] += rotate_process[i];
-      }
+      rotation_offset += 1.0f;
     }
     if (input_data.key_down[GLFW_KEY_D]) {
-      int late_tick = (int)kTickPerSecond * 0.5f;
-      float rotate_process[19] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07,
-                                  0.08, 0.09, 0.1,  0.09, 0.08, 0.07, 0.06,
-                                  0.05, 0.04, 0.03, 0.02, 0.01};
-      for (int i = 0; i < 19; i++) {
-        rotate_record[late_tick + i] -= rotate_process[i];
-      }
+      rotation_offset -= 1.0f;
     }
     rotation_offset *= kSecondPerTick * rotate_angular_speed * GetSpeedScale();
     game_core_->PushEventRotateUnit(id_, rotation_ + rotation_offset);
   }
 }
 
-void OldTank::TurretRotate() {
+void BurstTank::TurretRotate() {
   auto player = game_core_->GetPlayer(player_id_);
   if (player) {
     auto &input_data = player->GetInputData();
@@ -165,45 +130,49 @@ void OldTank::TurretRotate() {
   }
 }
 
-void OldTank::Fire() {
+void BurstTank::Fire() {
+  int fire_interval = kTickPerSecond / 2;
   if (fire_count_down_ == 0) {
     auto player = game_core_->GetPlayer(player_id_);
     if (player) {
       auto &input_data = player->GetInputData();
-      for (int i = 1; i < MaxTickPerSecond; i++) {
-        fire_record[i - 1] = fire_record[i];
+      if (input_data.mouse_button_down[GLFW_MOUSE_BUTTON_LEFT]) {
+        
       }
       if (input_data.mouse_button_down[GLFW_MOUSE_BUTTON_LEFT]) {
-        int late_tick = (int)kTickPerSecond * 0.6f;
-        fire_record[late_tick] = 1.0f;
-        fire_count_down_ = kTickPerSecond;
-      }
-      if (fire_record[0]) {
-        auto velocity = Rotate(glm::vec2{0.0f, 20.0f}, turret_rotation_);
+        auto velocity = Rotate(glm::vec2{0.0f, 10.0f}, turret_rotation_);
         GenerateBullet<bullet::CannonBall>(
             position_ + Rotate({0.0f, 1.2f}, turret_rotation_),
-            turret_rotation_, GetDamageScale(), velocity);
-        fire_count_down_ = kTickPerSecond;  // Fire interval 1 second.
+            turret_rotation_, 3.5*GetDamageScale(), velocity);
+        fire_count_down_ = 5 * kTickPerSecond;  // Fire interval 5 second.
       }
     }
   }
   if (fire_count_down_) {
     fire_count_down_--;
+    int time_spend = 5 * kTickPerSecond - fire_count_down_;
+    if (time_spend == fire_interval||time_spend==2*fire_interval) {
+      auto velocity = Rotate(glm::vec2{0.0f, 10.0f}, turret_rotation_);
+      GenerateBullet<bullet::CannonBall>(
+          position_ + Rotate({0.0f, 1.2f}, turret_rotation_), turret_rotation_,
+          3.5*GetDamageScale(), velocity);
+    }
+    
   }
 }
 
-bool OldTank::IsHit(glm::vec2 position) const {
+bool BurstTank::IsHit(glm::vec2 position) const {
   position = WorldToLocal(position);
   return position.x > -0.8f && position.x < 0.8f && position.y > -1.0f &&
          position.y < 1.0f && position.x + position.y < 1.6f &&
          position.y - position.x < 1.6f;
 }
 
-const char *OldTank::UnitName() const {
-  return "Old Tank";
+const char *BurstTank::UnitName() const {
+  return "Burst Fire Tank";
 }
 
-const char *OldTank::Author() const {
+const char *BurstTank::Author() const {
   return "Heyang Li";
 }
 }  // namespace battle_game::unit
